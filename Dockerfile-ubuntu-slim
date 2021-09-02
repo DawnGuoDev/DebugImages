@@ -1,0 +1,41 @@
+FROM ubuntu:20.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG APT_MIRROR=mirrors.aliyun.com
+RUN sed -ie "s/archive.ubuntu.com/${APT_MIRROR}/g" /etc/apt/sources.list
+
+RUN set -ex \
+    && apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
+    conntrack \
+    curl \
+    wget \
+    iptables \
+    iputils-ping \
+    net-tools \
+    jq \
+    nmap \
+    openssl \
+    python3 \
+    strace \
+    tcpdump \
+    vim-tiny \
+    htop && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Installing shell scripts
+COPY shell/* /shell/
+COPY bin/ansible/ /ansible
+COPY bashrc /root/.bashrc
+
+# Setting User and Home
+USER root
+WORKDIR /root
+ENV HOSTNAME trident-debug
+
+# Fix permissions for OpenShift
+RUN chmod -R g=u /root
+
+# Running bash
+CMD ["bash"]

@@ -1,0 +1,110 @@
+FROM debian:stable-slim as fetcher
+COPY build/fetch_binaries.sh /tmp/fetch_binaries.sh
+
+RUN apt-get update && apt-get install -y \
+  curl \
+  wget
+
+RUN /tmp/fetch_binaries.sh
+
+FROM ubuntu:20.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Shanghai
+
+RUN set -ex \
+    && apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
+    build-essential \
+    apache2-utils \
+    bash \
+    dnsutils \
+    bird \
+    bridge-utils \
+    busybox \
+    conntrack \
+    curl \
+    dhcping \
+    ethtool \
+    file\
+    fping \
+    iftop \
+    iperf \
+    iproute2 \
+    ipset \
+    iptables \ 
+    iptraf-ng \
+    iputils-ping \
+    net-tools \
+    ipvsadm \
+    jq \
+    libc6-dev \
+    liboping-dev \
+    mtr \
+    snmp \
+    snmp-mibs-downloader \
+    netcat-openbsd \
+    nftables \
+    ngrep \
+    nmap \
+    openssl \
+    python3-pip \
+    python3-setuptools \
+    scapy \
+    socat \
+    strace \
+    tcpdump \
+    tcptraceroute \
+    tshark \
+    util-linux \
+    vim \ 
+    git \
+    zsh \
+    gpg \
+    dirmngr \
+    gpg-agent \
+    htop \
+    monitorix \
+    ansible
+
+RUN echo "deb https://mirrors.aliyun.com/kubernetes/apt/ kubernetes-xenial main" >> /etc/apt/sources.list.d/kubernetes.list \
+    && gpg --keyserver keyserver.ubuntu.com --recv-keys 8B57C5C2836F4BEB \
+    && gpg --export --armor 8B57C5C2836F4BEB | apt-key add - \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends kubectl
+
+# Installing glances (https://nicolargo.github.io/glances/)
+RUN pip3 install glances
+
+# Installing httpie (https://httpie.io/docs#installation)
+RUN pip3 install --upgrade httpie
+
+# Installing shell scripts
+COPY shell/* /shell/
+
+# Installing ctop - top-like container monitor
+COPY --from=fetcher /tmp/ctop /usr/local/bin/ctop
+
+# Installing calicoctl
+COPY --from=fetcher /tmp/calicoctl /usr/local/bin/calicoctl
+
+# Installing termshark
+COPY --from=fetcher /tmp/termshark /usr/local/bin/termshark
+
+# Setting User and Home
+USER root
+WORKDIR /root
+ENV HOSTNAME trident-debug
+
+# ZSH Themes
+RUN wget https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh -O - | zsh
+RUN git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
+RUN git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
+COPY zshrc .zshrc
+
+# Fix permissions for OpenShift
+RUN chmod -R g=u /root
+
+# Running ZSH
+CMD ["zsh"]
